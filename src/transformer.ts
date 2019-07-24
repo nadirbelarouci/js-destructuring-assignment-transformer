@@ -1,4 +1,4 @@
-import ts = require("typescript");
+import * as ts from 'typescript'
 
 const source = `
   function ping(arr){
@@ -18,8 +18,16 @@ const source = `
   }
 `;
 
+const sourceFile = ts.createSourceFile(
+    '',
+    source,
+    ts.ScriptTarget.ES2016,
+    /*setParentNodes */ true
+);
+
 class ArrayBindingPatternInstance {
     bingingElements: Map<number, ts.BindingElement> = new Map();
+    variableDeclarations: Map<number, ts.VariableDeclaration> = new Map();
 
     constructor(variableDeclaration: ts.VariableDeclaration) {
         this.addBindingElement(variableDeclaration)
@@ -34,15 +42,39 @@ class ArrayBindingPatternInstance {
             return false;
 
         this.bingingElements.set(index, ts.createBindingElement(undefined, undefined, variableDeclaration.name));
+        this.variableDeclarations.set(index, variableDeclaration);
         return true;
     }
 
 
+    build(): ts.BindingElement[] {
+        return [...this.bingingElements.keys()].sort()
+            .map(i => this.bingingElements.get(i)) as ts.BindingElement[];
 
+    }
+
+    check(): ts.VariableDeclaration[] {
+        const sortedKeys: number [] = [...this.bingingElements.keys()].sort();
+        console.log(sortedKeys);
+        if (sortedKeys.length === 0)
+            return [];
+
+        for (let i = 0; i < sortedKeys.length; i++) {
+            if (sortedKeys[i] != i) {
+                console.log(sortedKeys.slice(i));
+                const toDeleteKeys = sortedKeys.slice(i);
+                toDeleteKeys.forEach(j => this.bingingElements.delete(j));
+                return toDeleteKeys.map(j => this.variableDeclarations.get(j)) as ts.VariableDeclaration[];
+            }
+        }
+
+        return []
+    }
 }
 
 class ArrayBindingPatternDeclarations {
     arrayBindingPatterns: Map<string, ArrayBindingPatternInstance> = new Map();
+    statementsToDelete: Map<ts.Node, string> = new Map();
 
     add(variableDeclaration: ts.VariableDeclaration) {
         const initializer = variableDeclaration.initializer as ts.ElementAccessExpression;
@@ -50,21 +82,57 @@ class ArrayBindingPatternDeclarations {
 
         if (this.arrayBindingPatterns.has(array)) {
             const arrayBindingElement = this.arrayBindingPatterns.get(array) as ArrayBindingPatternInstance;
-             arrayBindingElement.addBindingElement(variableDeclaration);
-
+            const toDelete = arrayBindingElement.addBindingElement(variableDeclaration);
+            if (toDelete)
+                this.statementsToDelete.set(variableDeclaration, array);
 
         } else {
+            this.statementsToDelete.set(variableDeclaration, array);
 
             this.arrayBindingPatterns.set(array, new ArrayBindingPatternInstance(variableDeclaration))
         }
     }
 
 
+    build(array: string): ts.VariableDeclaration {
+        const arrayBindingPattern = this.arrayBindingPatterns.get(array) as ArrayBindingPatternInstance;
+        return ts.createVariableDeclaration(
+            ts.createArrayBindingPattern(arrayBindingPattern.build()),
+            undefined,
+            ts.createIdentifier(array)
+        );
+    }
+
+    check() {
+        console.log("emmm")
+        this.arrayBindingPatterns.forEach(elements => {
+            console.log(elements)
+            const notValid = elements.check();
+            notValid.forEach(element => this.statementsToDelete.delete(element));
+        })
+    }
+
+    print() {
+        this.arrayBindingPatterns.forEach((value, key) => {
+            this.build(key)
+        })
+    }
 }
 
 class ArrayBindingPatternTransformer {
     declarations: Map<ts.Block, ArrayBindingPatternDeclarations> = new Map();
 
+    print() {
+        this.declarations.forEach((value, key) => {
+            console.log("blooock");
+
+            value.print()
+        })
+    }
+
+    check(){
+        this.declarations.forEach(value => value.check())
+    }
 
     transform<T extends ts.Node>(): ts.TransformerFactory<T> {
         const stack: ts.Block[] = [];
@@ -111,6 +179,7 @@ class ArrayBindingPatternTransformer {
             return node => ts.visitNode(node, visit);
         };
     }
+
     initArrayBindingPatternDeclarations<T extends ts.Node>(): ts.TransformerFactory<T> {
 
         const stack: ts.Block[] = [];
@@ -140,7 +209,6 @@ class ArrayBindingPatternTransformer {
 
 
 }
-
 
 const arrayBindingPatternTransformer = new ArrayBindingPatternTransformer();
 
