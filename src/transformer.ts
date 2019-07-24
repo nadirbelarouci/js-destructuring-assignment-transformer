@@ -1,29 +1,6 @@
-import * as ts from 'typescript'
-
-const source = `
-  function ping(arr){
-      var b = arr[1];
-      var c = arr[5],p = da,m = arr[9],p =arr[3];
-      var d = zz[0];
-      var x = zz[1];
-      if(true){
-        var d = ddd[0];
-        var x = ddd[1];
-      }
-      
-        var e = gg[0];
-        var f = gg[1];
-      const two = 2;
-      const four = 4;
-  }
-`;
-
-const sourceFile = ts.createSourceFile(
-    '',
-    source,
-    ts.ScriptTarget.ES2016,
-    /*setParentNodes */ true
-);
+import ts = require("typescript");
+import path = require("path");
+import {readFileSync, writeFile} from "fs";
 
 class ArrayBindingPatternInstance {
     bingingElements: Map<number, ts.BindingElement> = new Map();
@@ -55,13 +32,11 @@ class ArrayBindingPatternInstance {
 
     check(): ts.VariableDeclaration[] {
         const sortedKeys: number [] = [...this.bingingElements.keys()].sort();
-        console.log(sortedKeys);
         if (sortedKeys.length === 0)
             return [];
 
         for (let i = 0; i < sortedKeys.length; i++) {
             if (sortedKeys[i] != i) {
-                console.log(sortedKeys.slice(i));
                 const toDeleteKeys = sortedKeys.slice(i);
                 toDeleteKeys.forEach(j => this.bingingElements.delete(j));
                 return toDeleteKeys.map(j => this.variableDeclarations.get(j)) as ts.VariableDeclaration[];
@@ -104,33 +79,19 @@ class ArrayBindingPatternDeclarations {
     }
 
     check() {
-        console.log("emmm")
         this.arrayBindingPatterns.forEach(elements => {
-            console.log(elements)
             const notValid = elements.check();
             notValid.forEach(element => this.statementsToDelete.delete(element));
         })
     }
 
-    print() {
-        this.arrayBindingPatterns.forEach((value, key) => {
-            this.build(key)
-        })
-    }
 }
 
 class ArrayBindingPatternTransformer {
     declarations: Map<ts.Block, ArrayBindingPatternDeclarations> = new Map();
 
-    print() {
-        this.declarations.forEach((value, key) => {
-            console.log("blooock");
 
-            value.print()
-        })
-    }
-
-    check(){
+    check() {
         this.declarations.forEach(value => value.check())
     }
 
@@ -210,6 +171,10 @@ class ArrayBindingPatternTransformer {
 
 }
 
+const fileName = process.argv[2];
+
+const source = readFileSync(fileName).toString();
+
 const arrayBindingPatternTransformer = new ArrayBindingPatternTransformer();
 
 let result = ts.transpileModule(source, {
@@ -223,4 +188,15 @@ let result = ts.transpileModule(source, {
 });
 
 
-console.log(result.outputText);
+function save(code: string, fileName: string) {
+    fileName = fileName.substring(0, fileName.lastIndexOf('.js')) + '-result.js';
+    fileName = path.resolve(fileName);
+
+    writeFile(fileName, code, (err) => {
+        if (err) throw err;
+        console.log('The file has been saved in ' + fileName);
+    });
+
+}
+
+save(result.outputText, fileName);
