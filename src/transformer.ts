@@ -66,6 +66,51 @@ class ArrayBindingPatternTransformer {
     declarations: Map<ts.Block, ArrayBindingPatternDeclarations> = new Map();
 
 
+    transform<T extends ts.Node>(): ts.TransformerFactory<T> {
+        const stack: ts.Block[] = [];
+        const statementsToDelete: ts.Node[] = [];
+        let started = false;
+        return context => {
+            const visit: ts.Visitor = node => {
+                if (!started) {
+                    started = true;
+                    this.check();
+                }
+                if (ts.isBlock(node)) {
+                    stack.push(node);
+                }
+                const children = ts.visitEachChild(node, child => visit(child), context);
+                if (ts.isVariableDeclaration(node)) {
+                    const currentBlock: ts.Block = stack[stack.length - 1];
+
+                    const arrayBindingPatternDeclarations = this.declarations.get(currentBlock) as ArrayBindingPatternDeclarations;
+                    if (arrayBindingPatternDeclarations.statementsToDelete.has(node)) {
+                        const arrayName = arrayBindingPatternDeclarations.statementsToDelete.get(node) as string;
+                        if (arrayBindingPatternDeclarations.arrayBindingPatterns.has(arrayName)) {
+
+                            const result = arrayBindingPatternDeclarations.build(arrayName);
+                            arrayBindingPatternDeclarations.arrayBindingPatterns.delete(arrayName);
+                            return result;
+                        }
+                        statementsToDelete.push(node.parent);
+                        return
+                    }
+                }
+                if (node === statementsToDelete[statementsToDelete.length - 1]) {
+                    statementsToDelete.pop();
+                    if ((node as ts.VariableDeclarationList).declarations.length === 1) {
+                        return ts.createEmptyStatement();
+                    }
+                }
+                if (node === stack[stack.length - 1]) {
+                    stack.pop();
+                }
+                return children;
+            };
+
+            return node => ts.visitNode(node, visit);
+        };
+    }
     initArrayBindingPatternDeclarations<T extends ts.Node>(): ts.TransformerFactory<T> {
 
         const stack: ts.Block[] = [];
@@ -104,6 +149,7 @@ let result = ts.transpileModule(source, {
     transformers: {
         before: [
             arrayBindingPatternTransformer.initArrayBindingPatternDeclarations(),
+            arrayBindingPatternTransformer.transform()
         ]
     }
 });
