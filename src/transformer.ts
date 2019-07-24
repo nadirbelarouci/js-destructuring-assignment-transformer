@@ -1,9 +1,28 @@
 import ts = require("typescript");
 
-const source = `
-  const two = 2;
-  const four = 4;
-`;
+
+class ArrayBindingPatternInstance {
+    bingingElements: Map<number, ts.BindingElement> = new Map();
+
+    constructor(variableDeclaration: ts.VariableDeclaration) {
+        this.addBindingElement(variableDeclaration)
+    }
+
+    addBindingElement(variableDeclaration: ts.VariableDeclaration) {
+        const initializer = variableDeclaration.initializer as ts.ElementAccessExpression;
+        const indexNode = initializer.argumentExpression as ts.NumericLiteral;
+        const index = parseInt(indexNode.getText());
+
+        if (this.bingingElements.has(index))
+            return false;
+
+        this.bingingElements.set(index, ts.createBindingElement(undefined, undefined, variableDeclaration.name));
+        return true;
+    }
+
+
+
+}
 
 function numberTransformer<T extends ts.Node>(): ts.TransformerFactory<T> {
     return context => {
