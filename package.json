@@ -1,0 +1,14 @@
+{
+  "name": "js-destructuring-assignment-transformer",
+  "private": true,
+  "scripts": {
+    "start-1": "ts-node src/transformer"
+  },
+  "dependencies": {
+    "typescript": "^3.5.3"
+  },
+  "devDependencies": {
+    "@types/node": "^9.4.6",
+    "ts-node": "^4.1.0"
+  }
+}
