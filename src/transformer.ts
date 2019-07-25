@@ -151,7 +151,7 @@ class ArrayBindingPatternTransformer {
                     stack.push(node);
                     this.declarations.set(node, new ArrayBindingPatternDeclarations());
                 }
-                if (ts.isElementAccessExpression(node)) {
+                if (ts.isElementAccessExpression(node) && ts.isVariableDeclaration(node.parent)) {
                     const currentBlock: ts.Block = stack[stack.length - 1];
                     const arrayBindingPatternDeclarations = this.declarations.get(currentBlock) as ArrayBindingPatternDeclarations;
                     arrayBindingPatternDeclarations.add(node.parent as ts.VariableDeclaration);
